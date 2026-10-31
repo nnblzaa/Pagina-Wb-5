@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noticias climáticas del día</title>
+<style>
+  :root {
+    --verde-oscuro: #1b4332;
+    --verde: #2d6a4f;
+    --verde-claro: #d8f3dc;
+    --azul: #1d6f8a;
+    --tierra: #7f5539;
+    --fondo: #f1f8f2;
+    --texto: #1f2d24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: linear-gradient(180deg, var(--verde-claro) 0%, var(--fondo) 220px);
+    color: var(--texto);
+    line-height: 1.5;
+  }
+  header {
+    background: var(--verde-oscuro);
+    color: #fff;
+    padding: 28px 16px 24px;
+    text-align: center;
+    border-bottom: 5px solid var(--azul);
+  }
+  header h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 5vw, 2.2rem); }
+  header p { margin: 0 auto; max-width: 640px; font-size: 1rem; opacity: .92; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  .panel {
+    background: #fff;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(27, 67, 50, .12);
+  }
+  label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--verde-oscuro); }
+  .controles { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .campo { flex: 1 1 260px; }
+  select {
+    width: 100%;
+    padding: 11px 12px;
+    font-size: 1rem;
+    border: 2px solid var(--verde);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--texto);
+  }
+  button {
+    padding: 12px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    background: var(--verde);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  button:hover:not(:disabled) { background: var(--verde-oscuro); }
+  button:disabled { background: #8fa89b; cursor: not-allowed; }
+  #estado { margin-top: 18px; font-weight: 600; color: var(--azul); }
+  #estado.error { color: #b00020; }
+  #resultados { margin-top: 20px; display: none; }
+  #resultados h2 { margin: 0 0 10px; font-size: 1.15rem; color: var(--verde-oscuro); }
+  #fecha { color: var(--tierra); font-weight: 600; font-size: .95rem; }
+  #caja {
+    white-space: pre-line;
+    background: var(--fondo);
+    border-left: 5px solid var(--verde);
+    border-radius: 10px;
+    padding: 16px;
+    overflow-wrap: anywhere;
+  }
+  #caja a { color: var(--azul); font-weight: 600; }
+  footer { text-align: center; font-size: .85rem; color: #52665a; padding: 0 16px 24px; }
+  @media (max-width: 480px) {
+    button { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Noticias climáticas del día</h1>
+  <p>Esta página muestra un resumen de las noticias ambientales más recientes, explicado por inteligencia artificial.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="controles">
+      <div class="campo">
+        <label for="tema">Tema</label>
+        <select id="tema" name="tema">
+          <option>cambio climático</option>
+          <option>contaminación del mar</option>
+          <option>plásticos de un solo uso</option>
+          <option>energías renovables México</option>
+          <option>sequía Sinaloa</option>
+          <option>Mazatlán medio ambiente</option>
+        </select>
+      </div>
+      <button id="boton" type="button">Ver noticias</button>
+    </div>
+
+    <div id="estado" role="status" aria-live="polite"></div>
+
+    <div id="resultados">
+      <h2>Noticias de hoy · <span id="fecha"></span></h2>
+      <div id="caja"></div>
+    </div>
+  </section>
+</main>
+
+<footer>Resumen generado con IA a partir de Google News. Verifica siempre la información en las fuentes originales.</footer>
+
+<script>
+  // Pega aquí la URL de tu webhook de Make (Webhooks → Custom webhook):
+  const WEBHOOK_URL = "https://hook.us2.make.com/6i66wr5utdqiiptrsysoy5bbij9alrry";
+
+  const boton = document.getElementById("boton");
+  const selectTema = document.getElementById("tema");
+  const estado = document.getElementById("estado");
+  const resultados = document.getElementById("resultados");
+  const caja = document.getElementById("caja");
+  const fecha = document.getElementById("fecha");
+
+  function fechaDeHoy() {
+    return new Date().toLocaleDateString("es-MX", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric"
+    });
+  }
+
+  // Muestra el texto plano; las líneas que empiezan con http se vuelven enlaces.
+  function mostrarTexto(texto) {
+    caja.textContent = "";
+    const lineas = texto.split("\n");
+    lineas.forEach(function (linea, i) {
+      const limpia = linea.trim();
+      if (limpia.startsWith("http")) {
+        const a = document.createElement("a");
+        a.href = limpia;
+        a.textContent = limpia;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        caja.appendChild(a);
+      } else {
+        caja.appendChild(document.createTextNode(linea));
+      }
+      if (i < lineas.length - 1) {
+        caja.appendChild(document.createTextNode("\n"));
+      }
+    });
+  }
+
+  boton.addEventListener("click", async function () {
+    const tema = selectTema.value;
+    boton.disabled = true;
+    estado.className = "";
+    estado.textContent = "Buscando y resumiendo noticias...";
+    resultados.style.display = "none";
+
+    try {
+      const cuerpo = new URLSearchParams();
+      cuerpo.append("tema", tema);
+
+      const respuesta = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        body: cuerpo
+      });
+      if (!respuesta.ok) {
+        throw new Error("Respuesta no válida: " + respuesta.status);
+      }
+      const texto = await respuesta.text();
+
+      fecha.textContent = fechaDeHoy();
+      mostrarTexto(texto);
+      resultados.style.display = "block";
+      estado.textContent = "";
+    } catch (error) {
+      estado.className = "error";
+      estado.textContent = "No se pudieron obtener las noticias, intenta de nuevo.";
+    } finally {
+      boton.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
